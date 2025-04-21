@@ -35,8 +35,12 @@ The system is evaluated using:
 
 | Week   | Tasks |
 |--------|------------------------------------------------------|
-| **Week 10** (Ongoing) | - Set up Whisper transcription pipeline <br> - Set up Google Cloud STT API <br> - Run initial tests |
+| **Week 10** | - Set up Whisper transcription pipeline <br> - Set up Google Cloud STT API <br> - Run initial tests |
 | **Week 11** | - Implement evaluation metrics <br> - Evaluate pipeline on data |
+| **Week 12** | - Implement real time transciption pipeline for Whisper <br> - Improve Google cloud STT real time pipeline |
+| **Week 13** | - Research and Implement Noise removal techniques from audio <br> - Inetgrate into pipeline |
+| **Week 14** | - Test pipeline on data <br> -  Work on GUI for displaying transcription |
+| **Week 15** | - Compare results of normal and real time tramscription for Whisper and GCP STT <br> -  Compile Results |
 
 ## Team Members
 - Zainab Haider 
