@@ -3,6 +3,9 @@
 ## Overview
 This project focuses on Urdu speech transcription using **OpenAI Whisper Model**. It aims to evaluate the transcription performance on publicly available Urdu speech datasets and real-time audio inputs. The evaluation includes **Word Error Rate (WER) and Character Error Rate (CER)** comparisons with established benchmarks.
 
+## Abstract
+Low-resource languages like Urdu lack robust speech-to-text solutions, impacting accessibility in education, media, and public services. This project evaluates OpenAI’s Whisper for real-time Urdu transcription, focusing on accuracy, latency, and resource eﬃciency. By testing Whisper on clean and noisy audio samples, we aim to benchmark its performance using Word Error Rate (WER) and Character Error Rate (CER). The outcomes will include a validated Urdu transcription pipeline, performance benchmarks, and an annotated dataset, contributing to improved accessibility for Urdu speakers.
+
 ### Objectives
 - Extract and preprocess Urdu speech data from various sources.
 - Perform transcription using **OpenAI Whisper Model** (both normal and real-time).
