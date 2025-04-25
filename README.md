@@ -54,7 +54,7 @@ The system is evaluated using:
 
 ## Transcription Evaluation Results - Performance of WHISPER - Urdu vs english
 
-| Language | Model         | WER     |
+| Language | CER         | WER     |
 |----------|---------------|---------|
 | Urdu     | Whisper Large | 0.2666  |
 | English  | Whisper Large | 0.0608  |
