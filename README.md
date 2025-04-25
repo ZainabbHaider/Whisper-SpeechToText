@@ -59,6 +59,13 @@ The system is evaluated using:
 | Urdu     | Whisper Large | 0.2666  |
 | English  | Whisper Large | 0.0608  |
 
+## Transcription Evaluation Results - Clean vs Noisy Audio Performance (Whisper Large) - HuggingFace Dataset
+
+| Type  | Model         | WER   |
+|-------|---------------|--------|
+| Clean | Whisper Large | 0.315  |
+| Noisy | Whisper Large | 0.324  |
+
  
 ## Weekly Progress
 
