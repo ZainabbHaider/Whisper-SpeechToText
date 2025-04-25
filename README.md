@@ -22,6 +22,13 @@ We use publicly available Urdu speech datasets for training and evaluation:
 3. **[Faith Comes By Hearing](https://www.faithcomesbyhearing.com/audio-bible-resources/recordings-database)**  
    - Used for real-time speech transcription testing.
 
+## Techniques and Tools Used
+
+- Whisper by OpenAI for high-quality transcription.
+- Google Cloud Speech-to-Text API for baseline comparison.
+- RNNoise Wrapper for real-time noise reduction, ensuring cleaner inputs to the transcription models.
+- Custom content filtering to ensure output aligns with safe language guidelines, embedding basic guardrails for ethical AI usage.
+
 ## Evaluations
 The system is evaluated using:
 
