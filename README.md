@@ -26,7 +26,7 @@ We use publicly available Urdu speech datasets for training and evaluation:
 
 - Whisper by OpenAI for high-quality transcription.
 - Google Cloud Speech-to-Text API for baseline comparison.
-- RNNoise Wrapper for real-time noise reduction, ensuring cleaner inputs to the transcription models.
+- RNNoise{https://github.com/dbklim/RNNoise_Wrapper} Wrapper for real-time noise reduction, ensuring cleaner inputs to the transcription models.
 - Custom content filtering to ensure output aligns with safe language guidelines, embedding basic guardrails for ethical AI usage.
 
 ## Evaluations
