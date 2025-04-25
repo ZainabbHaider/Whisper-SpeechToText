@@ -1,119 +1,222 @@
-#! python3.7
-
-import argparse
 import os
 import numpy as np
 import speech_recognition as sr
 import whisper
 import torch
-
+import tkinter as tk
+from tkinter import ttk, scrolledtext, filedialog, messagebox
+import threading
 from datetime import datetime, timedelta
 from queue import Queue
 from time import sleep
 from sys import platform
+import rnnoise_wrapper
 
+class SpeechToTextApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Speech-to-Text Transcriber with RNNoise")
+        self.root.geometry("800x600")
+        self.root.minsize(600, 400)
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="medium", help="Model to use",
-                        choices=["tiny", "base", "small", "medium", "large"])
-    parser.add_argument("--non_english", action='store_true',
-                        help="Don't use the english model.")
-    parser.add_argument("--energy_threshold", default=1000,
-                        help="Energy level for mic to detect.", type=int)
-    parser.add_argument("--record_timeout", default=2,
-                        help="How real time the recording is in seconds.", type=float)
-    parser.add_argument("--phrase_timeout", default=3,
-                        help="How much empty space between recordings before we "
-                             "consider it a new line in the transcription.", type=float)
-    if 'linux' in platform:
-        parser.add_argument("--default_microphone", default='pulse',
-                            help="Default microphone name for SpeechRecognition. "
-                                 "Run this with 'list' to view available Microphones.", type=str)
-    args = parser.parse_args()
+        self.recording = False
+        self.data_queue = Queue()
+        self.transcription = ['']
+        self.audio_model = None
+        self.recorder = sr.Recognizer()
+        self.source = None
+        self.thread = None
+        self.phrase_time = None
+        self.rnnoise = rnnoise_wrapper.RNNoise()
 
-    phrase_time = None
-    data_queue = Queue()
-    recorder = sr.Recognizer()
-    recorder.energy_threshold = args.energy_threshold
-    recorder.dynamic_energy_threshold = False
+        main_frame = ttk.Frame(root, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
-    if 'linux' in platform:
-        mic_name = args.default_microphone
-        if not mic_name or mic_name == 'list':
-            print("Available microphone devices are: ")
-            for index, name in enumerate(sr.Microphone.list_microphone_names()):
-                print(f"Microphone with name \"{name}\" found")
-            return
-        else:
-            for index, name in enumerate(sr.Microphone.list_microphone_names()):
-                if mic_name in name:
-                    source = sr.Microphone(sample_rate=16000, device_index=index)
-                    break
-    else:
-        source = sr.Microphone(sample_rate=16000)
+        control_frame = ttk.LabelFrame(main_frame, text="Controls", padding="10")
+        control_frame.pack(fill=tk.X, pady=5)
 
-    model = args.model
-    if args.model != "large" and not args.non_english:
-        model = model + ".en"
-    audio_model = whisper.load_model(model)
+        ttk.Label(control_frame, text="Model:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        self.model_var = tk.StringVar(value="medium")
+        model_combo = ttk.Combobox(control_frame, textvariable=self.model_var, values=["tiny", "base", "small", "medium", "large"])
+        model_combo.grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
 
-    record_timeout = args.record_timeout
-    phrase_timeout = args.phrase_timeout
+        self.english_var = tk.BooleanVar(value=True)
+        english_check = ttk.Checkbutton(control_frame, text="Use English model", variable=self.english_var)
+        english_check.grid(row=0, column=2, sticky=tk.W, padx=5, pady=5)
 
-    transcription = ['']
+        ttk.Label(control_frame, text="Energy Threshold:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+        self.energy_var = tk.IntVar(value=1000)
+        energy_entry = ttk.Spinbox(control_frame, from_=0, to=5000, increment=100, textvariable=self.energy_var, width=10)
+        energy_entry.grid(row=1, column=1, sticky=tk.W, padx=5, pady=5)
 
-    with source:
-        recorder.adjust_for_ambient_noise(source)
+        ttk.Label(control_frame, text="Record Timeout (s):").grid(row=1, column=2, sticky=tk.W, padx=5, pady=5)
+        self.rec_timeout_var = tk.DoubleVar(value=2.0)
+        rec_timeout_entry = ttk.Spinbox(control_frame, from_=0.5, to=10.0, increment=0.5, textvariable=self.rec_timeout_var, width=5)
+        rec_timeout_entry.grid(row=1, column=3, sticky=tk.W, padx=5, pady=5)
 
-    def record_callback(_, audio: sr.AudioData) -> None:
-        data = audio.get_raw_data()
-        data_queue.put(data)
+        ttk.Label(control_frame, text="Phrase Timeout (s):").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+        self.phrase_timeout_var = tk.DoubleVar(value=3.0)
+        phrase_timeout_entry = ttk.Spinbox(control_frame, from_=0.5, to=10.0, increment=0.5, textvariable=self.phrase_timeout_var, width=5)
+        phrase_timeout_entry.grid(row=2, column=1, sticky=tk.W, padx=5, pady=5)
 
-    recorder.listen_in_background(source, record_callback, phrase_time_limit=record_timeout)
+        ttk.Label(control_frame, text="Language Code:").grid(row=2, column=2, sticky=tk.W, padx=5, pady=5)
+        self.language_var = tk.StringVar(value="en")
+        language_entry = ttk.Entry(control_frame, textvariable=self.language_var, width=5)
+        language_entry.grid(row=2, column=3, sticky=tk.W, padx=5, pady=5)
 
-    print("Model loaded.\n")
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=5)
 
-    while True:
+        self.load_button = ttk.Button(button_frame, text="Load Model", command=self.load_model)
+        self.load_button.pack(side=tk.LEFT, padx=5)
+
+        self.start_button = ttk.Button(button_frame, text="Start Recording", command=self.toggle_recording, state=tk.DISABLED)
+        self.start_button.pack(side=tk.LEFT, padx=5)
+
+        self.save_button = ttk.Button(button_frame, text="Save Transcription", command=self.save_transcription, state=tk.DISABLED)
+        self.save_button.pack(side=tk.LEFT, padx=5)
+
+        self.clear_button = ttk.Button(button_frame, text="Clear", command=self.clear_transcription)
+        self.clear_button.pack(side=tk.LEFT, padx=5)
+
+        self.status_var = tk.StringVar(value="Ready to load model")
+        status_label = ttk.Label(main_frame, textvariable=self.status_var, relief=tk.SUNKEN)
+        status_label.pack(fill=tk.X, pady=5)
+
+        ttk.Label(main_frame, text="Transcription:").pack(anchor=tk.W, pady=(10, 0))
+        self.transcription_text = scrolledtext.ScrolledText(main_frame, wrap=tk.WORD, height=15)
+        self.transcription_text.pack(fill=tk.BOTH, expand=True, pady=5)
+
+    def load_model(self):
         try:
-            now = datetime.utcnow()
-            if not data_queue.empty():
-                phrase_complete = False
-                if phrase_time and now - phrase_time > timedelta(seconds=phrase_timeout):
-                    phrase_complete = True
-                phrase_time = now
+            self.status_var.set("Loading model... Please wait.")
+            self.root.update()
+            model = self.model_var.get()
+            if model != "large" and self.english_var.get():
+                model += ".en"
+            thread = threading.Thread(target=self._load_model_thread, args=(model,))
+            thread.daemon = True
+            thread.start()
+        except Exception as e:
+            self.status_var.set(f"Error loading model: {str(e)}")
+            messagebox.showerror("Error", f"Failed to load model: {str(e)}")
 
-                audio_data = b''.join(data_queue.queue)
-                data_queue.queue.clear()
+    def _load_model_thread(self, model):
+        try:
+            self.audio_model = whisper.load_model(model)
+            self.root.after(0, self._model_loaded)
+        except Exception as e:
+            self.root.after(0, lambda: self._model_load_error(str(e)))
 
-                audio_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
+    def _model_loaded(self):
+        self.status_var.set(f"Model {self.model_var.get()} loaded successfully")
+        self.start_button.config(state=tk.NORMAL)
 
-                result = audio_model.transcribe(audio_np, fp16=torch.cuda.is_available(), language="ur")
-                text = result['text'].strip()
+    def _model_load_error(self, error_msg):
+        self.status_var.set(f"Error loading model: {error_msg}")
+        messagebox.showerror("Error", f"Failed to load model: {error_msg}")
 
-                if phrase_complete:
-                    transcription.append(text)
+    def toggle_recording(self):
+        if not self.recording:
+            self.start_recording()
+        else:
+            self.stop_recording()
+
+    def start_recording(self):
+        try:
+            self.recorder.energy_threshold = self.energy_var.get()
+            self.recorder.dynamic_energy_threshold = False
+            self.source = sr.Microphone(sample_rate=16000)
+            with self.source:
+                self.recorder.adjust_for_ambient_noise(self.source)
+            self.recorder.listen_in_background(self.source, self.record_callback,
+                                               phrase_time_limit=self.rec_timeout_var.get())
+            self.recording = True
+            self.data_queue = Queue()
+            self.phrase_time = None
+            self.thread = threading.Thread(target=self.process_audio)
+            self.thread.daemon = True
+            self.thread.start()
+            self.start_button.config(text="Stop Recording")
+            self.load_button.config(state=tk.DISABLED)
+            self.save_button.config(state=tk.NORMAL)
+            self.status_var.set("Recording... Speak now")
+        except Exception as e:
+            self.status_var.set(f"Error starting recording: {str(e)}")
+            messagebox.showerror("Error", f"Failed to start recording: {str(e)}")
+
+    def record_callback(self, _, audio: sr.AudioData) -> None:
+        data = audio.get_raw_data()
+        self.data_queue.put(data)
+
+    def process_audio(self):
+        try:
+            while self.recording:
+                now = datetime.utcnow()
+                if not self.data_queue.empty():
+                    phrase_complete = False
+                    if self.phrase_time and now - self.phrase_time > timedelta(seconds=self.phrase_timeout_var.get()):
+                        phrase_complete = True
+                    self.phrase_time = now
+
+                    audio_data = b''.join(list(self.data_queue.queue))
+                    self.data_queue.queue.clear()
+
+                    # Convert to numpy and normalize
+                    audio_np = np.frombuffer(audio_data, dtype=np.int16)
+
+                    # Apply RNNoise denoising
+                    denoised = np.array([self.rnnoise.filter(sample) for sample in audio_np], dtype=np.float32) / 32768.0
+
+                    language = None if self.english_var.get() else self.language_var.get()
+                    result = self.audio_model.transcribe(denoised, fp16=torch.cuda.is_available(), language=language)
+                    text = result['text'].strip()
+
+                    if phrase_complete:
+                        self.transcription.append(text)
+                    else:
+                        self.transcription[-1] = text
+
+                    self.root.after(0, self.update_transcription_text)
                 else:
-                    transcription[-1] = text
+                    sleep(0.25)
+        except Exception as e:
+            self.root.after(0, lambda: self.status_var.set(f"Error in processing: {str(e)}"))
 
-                os.system('cls' if os.name == 'nt' else 'clear')
-                for line in transcription:
-                    print(line)
-                print('', end='', flush=True)
-            else:
-                sleep(0.25)
-        except KeyboardInterrupt:
-            break
+    def update_transcription_text(self):
+        self.transcription_text.delete(1.0, tk.END)
+        for line in self.transcription:
+            if line:
+                self.transcription_text.insert(tk.END, line + "\n\n")
 
-    print("\n\nTranscription:")
-    for line in transcription:
-        print(line)
+    def stop_recording(self):
+        self.recording = False
+        if self.thread:
+            self.thread.join(1.0)
+        self.start_button.config(text="Start Recording")
+        self.load_button.config(state=tk.NORMAL)
+        self.status_var.set("Recording stopped")
 
-    # Save transcription to a text file
-    with open("transcription_output.txt", "w", encoding="utf-8") as f:
-        for line in transcription:
-            f.write(line + "\n")
+    def save_transcription(self):
+        try:
+            file_path = filedialog.asksaveasfilename(defaultextension=".txt",
+                                                     filetypes=[("Text files", ".txt"), ("All files", ".*")],
+                                                     title="Save Transcription")
+            if file_path:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    for line in self.transcription:
+                        if line:
+                            f.write(line + "\n")
+                self.status_var.set(f"Transcription saved to {file_path}")
+        except Exception as e:
+            self.status_var.set(f"Error saving file: {str(e)}")
+            messagebox.showerror("Error", f"Failed to save file: {str(e)}")
 
+    def clear_transcription(self):
+        self.transcription = ['']
+        self.transcription_text.delete(1.0, tk.END)
 
 if __name__ == "__main__":
-    main()
+    root = tk.Tk()
+    app = SpeechToTextApp(root)
+    root.mainloop()
