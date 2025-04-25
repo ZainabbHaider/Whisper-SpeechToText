@@ -41,6 +41,25 @@ The system is evaluated using:
   - Both **batch processing** and **real-time transcription**.
   - Constraint: Real-time transcription is limited to **1-minute audio clips**.
 
+## Transcription Evaluation Results - not real time
+
+| Dataset       | Method           | WER     | CER     | Latency (s) |
+|---------------|------------------|---------|---------|-------------|
+| **Kaggle**    | Whisper Medium   | 0.3679  | 0.1320  | 1.06        |
+|               | Whisper Large    | 0.2763  | 0.0894  | 1.29        |
+|               | GCP              | 0.2894  | 0.1283  | 1.02        |
+| **Hugging Face** | Whisper Medium | 0.2963  | 0.0978  | 1.18        |
+|               | Whisper Large    | 0.1955  | 0.0626  | 1.46        |
+|               | GCP              | 0.1743  | 0.0692  | 0.89        |
+
+## Transcription Evaluation Results - Performance of WHISPER - Urdu vs english
+
+| Language | Model         | WER     |
+|----------|---------------|---------|
+| Urdu     | Whisper Large | 0.2666  |
+| English  | Whisper Large | 0.0608  |
+
+ 
 ## Weekly Progress
 
 | Week   | Tasks |
