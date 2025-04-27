@@ -174,10 +174,12 @@ class SpeechToTextApp:
                     text = result['text'].strip()
 
                     if text and not is_toxic_urdu(text):  # Content filtering applied here
-                        self.transcriptions.append(text)
-                        self.root.after(0, self.update_transcription_text)
+                        if phrase_complete:
+                            self.transcription.append(text)
+                        else:
+                            self.transcription[-1] = text
 
-                    self.root.after(0, self.update_transcription_text)
+                        self.root.after(0, self.update_transcription_text)
                 else:
                     sleep(0.25)
         except Exception as e:
