@@ -11,6 +11,7 @@ from queue import Queue
 from time import sleep
 from sys import platform
 import rnnoise_wrapper
+from content_filter import is_toxic_urdu
 
 class SpeechToTextApp:
     def __init__(self, root):
@@ -172,10 +173,9 @@ class SpeechToTextApp:
                     result = self.audio_model.transcribe(denoised, fp16=torch.cuda.is_available(), language=language)
                     text = result['text'].strip()
 
-                    if phrase_complete:
-                        self.transcription.append(text)
-                    else:
-                        self.transcription[-1] = text
+                    if text and not is_toxic_urdu(text):  # Content filtering applied here
+                        self.transcriptions.append(text)
+                        self.root.after(0, self.update_transcription_text)
 
                     self.root.after(0, self.update_transcription_text)
                 else:
